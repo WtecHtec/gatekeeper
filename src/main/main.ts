@@ -2,7 +2,7 @@
 
 import path from 'path';
 import fs from 'fs';
-import { app, BrowserWindow, shell, ipcMain, screen, Tray, Menu } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, screen, Tray, Menu, protocol, net } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -144,11 +144,8 @@ ipcMain.on('save-settings', (event, settings) => saveSettings(settings));
 ipcMain.handle('get-version', () => "0.0.1");
 ipcMain.on('dismiss-cat', () => dismissCat());
 ipcMain.handle('get-asset-path', (_event, filename: string) => {
-  const assetsPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, '../../assets');
-  // Convert to file:// URL with forward slashes (required on Windows)
-  return `file://${assetsPath.replace(/\\/g, '/')}/${filename}`;
+  // Use custom asset:// protocol which works from both http:// (dev) and file:// (prod)
+  return `asset://${filename}`;
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -267,9 +264,26 @@ app.on('before-quit', () => {
 
 app.setName('Cat Gatekeeper');
 
+// Must be called before app.whenReady()
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'asset', privileges: { secure: true, standard: true, supportFetchAPI: true } },
+]);
+
 app
   .whenReady()
   .then(() => {
+    // Register asset:// protocol to serve files from the assets directory.
+    // This works from both http:// (dev) and file:// (prod) renderer pages.
+    const assetsPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'assets')
+      : path.join(__dirname, '../../assets');
+    protocol.handle('asset', (request) => {
+      const url = new URL(request.url);
+      // For asset://neko1.webm, hostname = 'neko1.webm', pathname = '/'
+      const filename = url.hostname;
+      const filePath = path.join(assetsPath, filename).replace(/\\/g, '/');
+      return net.fetch(`file://${filePath}`);
+    });
     if (process.platform === 'darwin') {
       const RESOURCES_PATH = app.isPackaged
         ? path.join(process.resourcesPath, 'assets')
