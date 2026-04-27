@@ -1,22 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import neko1 from '../../assets/neko1.webm';
+import neko2 from '../../assets/neko2.webm';
 
 export default function Display() {
   const [isVideoEnded, setIsVideoEnded] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [neko1Url, setNeko1Url] = useState('');
-  const [neko2Url, setNeko2Url] = useState('');
 
   useEffect(() => {
     const fetchSettings = async () => {
-      const [settings, url1, url2] = await Promise.all([
-        window.electron.ipcRenderer.invoke('get-settings'),
-        window.electron.ipcRenderer.invoke('get-asset-path', 'neko1.webm'),
-        window.electron.ipcRenderer.invoke('get-asset-path', 'neko2.webm'),
-      ]);
-      setSeconds(((settings as any).breakTime || 5) * 60);
-      setNeko1Url(url1 as string);
-      setNeko2Url(url2 as string);
+      const settings = (await window.electron.ipcRenderer.invoke('get-settings')) as any;
+      setSeconds((settings.breakTime || 5) * 60);
       setIsLoaded(true);
     };
     fetchSettings();
@@ -43,28 +37,34 @@ export default function Display() {
   const s = seconds % 60;
   const timeString = `${m}:${String(s).padStart(2, '0')}`;
 
+  const handleVideoRef = (node: HTMLVideoElement | null) => {
+    if (node) {
+      node.play().catch(console.error);
+    }
+  };
+
   return (
     <div className="display-container">
       {isLoaded && <div className="countdown">{timeString}</div>}
       
-      {neko1Url && (!isVideoEnded ? (
-        <video
-          src={neko1Url}
-          autoPlay
-          muted
-          playsInline
-          onEnded={() => setIsVideoEnded(true)}
+      {!isVideoEnded ? (
+        <video 
+          ref={handleVideoRef}
+          src={neko1} 
+          muted 
+          playsInline 
+          onEnded={() => setIsVideoEnded(true)} 
         />
       ) : (
-        <video
-          src={neko2Url}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="sleeping"
+        <video 
+          ref={handleVideoRef}
+          src={neko2} 
+          muted 
+          loop 
+          playsInline 
+          className="sleeping" 
         />
-      ))}
+      )}
     </div>
   );
 }
