@@ -143,6 +143,13 @@ ipcMain.handle('get-settings', () => getSettings());
 ipcMain.on('save-settings', (event, settings) => saveSettings(settings));
 ipcMain.handle('get-version', () => "0.0.1");
 ipcMain.on('dismiss-cat', () => dismissCat());
+ipcMain.handle('get-asset-path', (_event, filename: string) => {
+  const assetsPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets')
+    : path.join(__dirname, '../../assets');
+  // Convert to file:// URL with forward slashes (required on Windows)
+  return `file://${assetsPath.replace(/\\/g, '/')}/${filename}`;
+});
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
